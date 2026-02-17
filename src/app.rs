@@ -1,4 +1,7 @@
-use egui::{Context, FontFamily, FontId, Key, RichText, TextStyle};
+//use std::fs;
+use std::process::Command;
+use egui::{Key, RichText};
+use rfd::FileDialog;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -72,20 +75,38 @@ impl eframe::App for ChauncerApp {
                 self.apps = Vec::new()
             }
             if ui.button("Add App [+]").clicked() {
-                let _ = &mut self.apps.push("heyo".to_string());
+                let files = FileDialog::new()
+                .add_filter("Executable", &["exe"])
+                .set_directory("C:/")
+                .pick_file();
+                
+                let picked_path = files.expect("Holy moly this was supposed to be a file!");
+                let path = picked_path.as_path();
+                let exe_path = path.to_str().unwrap();
+                if ! self.apps.contains(&exe_path.to_string()){
+                    let _ = &mut self.apps.push(exe_path.to_string());
+                }
+                
+                
             }
             
             for i in &mut self.apps.iter(){
-                ui.label(RichText::new(i));
+                if ui.button(RichText::new(get_executable_name(i))).clicked(){
+                    let open_app = Command::new("cmd")
+                    .args(["/C", i])
+                    .output()
+                    .expect("Failed to open app");
+                let damn = String::from_utf8(open_app.stdout);
+                println!("{} : {}", damn.unwrap(), i)
+                };
             }
         });
     }
 }
 
-
-fn set_styles(ctx: &Context) {
-    let mut style = (*ctx.style()).clone();
-    style.text_styles = [(TextStyle::Heading,FontId::new(30.0, FontFamily::Monospace))].into();
-    ctx.set_style(style);
-    
+fn get_executable_name(path : &String) -> String{
+    let mut new_path = path.clone();
+    let split_path : Vec<&str> = new_path.split("\\").collect();
+    new_path = (*split_path.get(split_path.iter().count() - 1).unwrap()).to_string().replace(".exe", "");
+    new_path
 }
