@@ -1,18 +1,32 @@
+use std::collections::HashMap;
+
 use open::{self, that};
-use egui::{Key, RichText, ThemePreference, Vec2};
+use egui::{Key, RichText, ThemePreference, Vec2, Window};
 use rfd::FileDialog;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct ChauncerApp {
-    apps : Vec<String>
+    apps : Vec<String>,
+    apps_aliases : HashMap<String, String>,
+
+    #[serde(skip)]
+    app_selected : bool,
+    #[serde(skip)]
+    current_app_name : String,
+    #[serde(skip)]
+    current_path : String
 }
 
 impl Default for ChauncerApp {
     fn default() -> Self {
         Self {
-            apps : Vec::new()
+            apps : Vec::new(),
+            apps_aliases : HashMap::new(),
+            app_selected : false,
+            current_app_name : "".to_string(),
+            current_path : "".to_string()
         }
     }
 }
@@ -57,6 +71,34 @@ impl eframe::App for ChauncerApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            
+            if self.app_selected{
+                Window::new("Confirm App Name").show(ctx, |ui|{
+                    //ui.label(RichText::new(format!("App Name:")));
+                    
+                    ui.add(egui::TextEdit::singleline(&mut self.current_app_name).hint_text(get_executable_name(&self.current_path)));
+
+                    if self.current_app_name == "".to_string(){
+                        self.apps_aliases.insert(self.current_path.clone(), get_executable_name(&self.current_path));
+                    } else {
+                        self.apps_aliases.insert(self.current_path.clone(), self.current_app_name.clone());
+                    }
+
+                    ui.label(RichText::new(&self.current_path));
+                    if ui.button("Add App").clicked(){
+                        
+                        if ! self.apps.contains(&self.current_path){
+                            let _ = &mut self.apps.push(self.current_path.clone());
+                        }
+                        self.app_selected = false
+                    };
+                    if ui.button("Cancel").clicked(){
+                        self.app_selected = false
+                    };
+                }); 
+            }
+
+            
             ui.heading("Applications");
             
             if ui.input(|i| i.key_pressed(Key::Escape)){
@@ -66,16 +108,18 @@ impl eframe::App for ChauncerApp {
                 self.apps = Vec::new()
             }
             if ui.button("Add App [+]").clicked() {
+
                 let files = FileDialog::new()
                 .add_filter("Executable", &["exe"])
                 .set_directory("C:/")
                 .pick_file();
                 
-                let picked_path = files.expect("Holy moly this was supposed to be a file!");
-                let path = picked_path.as_path();
-                let exe_path = path.to_str().unwrap();
-                if ! self.apps.contains(&exe_path.to_string()){
-                    let _ = &mut self.apps.push(exe_path.to_string());
+                if files.is_some(){
+                    let picked_path = files.expect("Holy moly this was supposed to be a file!");
+                    let path = picked_path.as_path();
+                    let exe_path = path.to_str().unwrap();
+                    self.current_path = exe_path.to_string();
+                    self.app_selected = true;
                 }
             };
             ui.add_space(16.0);
@@ -90,7 +134,14 @@ impl eframe::App for ChauncerApp {
                             .max_size(Vec2 { x: 32.0, y: 32.0 })
                     );
                     ui.add_space(8.0);
-                    let text = RichText::new(get_executable_name(i)).size(16.0);
+                    let app_name = self.apps_aliases.get(i);
+                    let text : RichText;
+                    if app_name.is_some(){
+                        text = RichText::new(app_name.unwrap().to_string()).size(16.0);
+                    } else {
+                        text = RichText::new(i).size(16.0);
+                    }
+                    
                     if ui.button(text).clicked(){
                         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                         open_app(i);
@@ -98,37 +149,6 @@ impl eframe::App for ChauncerApp {
                     ui.add_space(8.0);
                 }
             });
-        });
-    }
-}
-
-
-#[warn(unused)]
-pub struct OpenPopup {
-    name : String,
-    path : String
-}
-
-impl Default for OpenPopup {
-    fn default() -> Self {
-        Self {
-            name: "".to_string(),
-            path: "".to_string()
-        }
-    }
-}
-
-impl OpenPopup {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        Default::default()        
-    }
-}
-
-impl eframe::App for OpenPopup{
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let &mut mut name_text = &mut "yo";
-            egui::TextEdit::singleline(&mut name_text).show(ui)
         });
     }
 }
@@ -147,5 +167,9 @@ fn set_stylings(ctx: &egui::Context){
 }
 
 fn open_app(name : &String){
-    let _ = that(name);
+    let open = that(name);
+    match open {
+        Ok(()) => {}
+        Err(err) => {println!("{:?}", err)}
+    }
 }
