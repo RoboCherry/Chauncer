@@ -17,12 +17,10 @@ eframe = { version = "0.33.0", default-features = false, features = [
 ] }
 
 serde = { version = "1.0.228", features = ["derive"] }
-
-log = "0.4.27"
 image = {version = "0.25.9", features = ["png", "jpeg"]}
-env_logger = "0.11.8"
 rfd = "0.17.2"
 open = "5.3.3"
+file_icon_provider = "1.0.0"
 
 
 
