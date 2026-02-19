@@ -14,11 +14,11 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Chauncer",
+        "Catapult",
         native_options.clone(),
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(app::ChauncerApp::new(cc)))
+            Ok(Box::new(app::CatapultApp::new(cc)))
         }),
     )
 }

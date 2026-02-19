@@ -8,7 +8,7 @@ use rfd::FileDialog;
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
-pub struct ChauncerApp {
+pub struct CatapultApp {
     apps : Vec<String>,
     apps_aliases : HashMap<String, String>,
 
@@ -28,7 +28,7 @@ pub struct ChauncerApp {
     current_path : String
 }
 
-impl Default for ChauncerApp {
+impl Default for CatapultApp {
     fn default() -> Self {
         Self {
             apps : Vec::new(),
@@ -43,7 +43,7 @@ impl Default for ChauncerApp {
     }
 }
 
-impl ChauncerApp {
+impl CatapultApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
@@ -54,7 +54,7 @@ impl ChauncerApp {
     }
 }
 
-impl eframe::App for ChauncerApp {
+impl eframe::App for CatapultApp {
     /// Called by the framework to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);

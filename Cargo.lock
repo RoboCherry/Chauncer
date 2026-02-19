@@ -397,6 +397,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "catapult"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "egui_extras",
+ "file_icon_provider",
+ "image",
+ "open",
+ "rfd",
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -453,20 +467,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ced0551234e87afee12411d535648dd89d2e7f34c78b753395567aff3d447ff"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "chauncer"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
- "egui_extras",
- "file_icon_provider",
- "image",
- "open",
- "rfd",
- "serde",
 ]
 
 [[package]]

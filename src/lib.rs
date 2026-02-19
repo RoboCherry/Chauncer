@@ -1,2 +1,2 @@
 mod app;
-pub use app::ChauncerApp;
+pub use app::CatapultApp;
