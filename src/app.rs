@@ -392,8 +392,8 @@ fn get_color_icon(exe_path : String, size : [usize; 2]) -> ColorImage{
 }
 
 fn time_from_millis(millis : usize) -> String{
-    let seconds = (millis / 1000) % 60;
-    let minutes = (seconds / 60) % 60;
-    let hours = (minutes / 60) % 24;
-    format!("{} hours, {} minutes, {} seconds", hours, minutes, seconds)
+    let seconds = millis / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    format!("{} hours, {} minutes, {} seconds", hours % 24, minutes % 60, seconds % 60)
 }
