@@ -1,21 +1,27 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command, time::{Duration, Instant}};
 use file_icon_provider::get_file_icon;
 use image::{DynamicImage, RgbaImage};
-use open::{self, that};
 use egui::{Color32, ColorImage, FontFamily, FontId, Id, Key, RichText, TextStyle, TextureHandle, TextureOptions, ThemePreference, Vec2, Window, load::SizedTexture};
 use rfd::FileDialog;
+use sysinfo::{Pid, Process, ProcessRefreshKind, RefreshKind, System};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct CatapultApp {
+
+    #[serde(skip)]
+    delta_time : Duration,
+    #[serde(skip)]
+    last_instant : Instant,
+
     apps : Vec<String>,
+    selected_app : String,
     apps_aliases : HashMap<String, String>,
+    app_play_time : HashMap<String, usize>,
 
     #[serde(skip)]
     app_texture_handles : HashMap<String, TextureHandle>,
-
-    selected_app : String,
 
     #[serde(skip)]
     edit : bool,
@@ -25,20 +31,34 @@ pub struct CatapultApp {
     #[serde(skip)]
     current_app_name : String,
     #[serde(skip)]
-    current_path : String
+    current_path : String,
+
+    #[serde(skip)]
+    sys : System,
+
+    #[serde(skip)]
+    running_apps : HashMap<String,usize>,
+    #[serde(skip)]
+    app_to_remove : String,
 }
 
 impl Default for CatapultApp {
     fn default() -> Self {
         Self {
+            delta_time : Duration::new(0, 0),
+            last_instant : Instant::now(),
             apps : Vec::new(),
             apps_aliases : HashMap::new(),
             app_texture_handles : HashMap::new(),
+            app_play_time : HashMap::new(),
             selected_app : "".to_string(),
             edit : false,
             is_app_selected : false,
             current_app_name : "".to_string(),
-            current_path : "".to_string()
+            current_path : "".to_string(),
+            sys : System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything())),
+            running_apps : HashMap::new(),
+            app_to_remove : "".to_string(),
         }
     }
 }
@@ -125,12 +145,16 @@ impl eframe::App for CatapultApp {
                         self.current_app_name = "".to_string();
                         if ! self.apps.contains(&self.current_path){
                             let _ = &mut self.apps.push(self.current_path.clone());
+                            self.app_play_time.insert(self.current_path.clone(), 0);
                             self.apps.sort_by(|a, b| {
                                 let a_name = self.apps_aliases.get(a).unwrap().to_lowercase();
                                 let b_name = self.apps_aliases.get(b).unwrap().to_lowercase();
                                 a_name.cmp(&b_name)
                             });
                         } else {
+                            if self.app_play_time.get(&self.current_path.clone()).is_none(){
+                                self.app_play_time.insert(self.current_path.clone(), 0);
+                            }
                             self.apps.sort_by(|a, b| {
                                 let a_name = self.apps_aliases.get(a).unwrap().to_lowercase();
                                 let b_name = self.apps_aliases.get(b).unwrap().to_lowercase();
@@ -196,9 +220,7 @@ impl eframe::App for CatapultApp {
                     }
 
                     if ui.add(egui::Button::image_and_text(icon.clone(), text.clone()).min_size(Vec2 { x: 32.0, y: 32.0 })).clicked(){
-                        //ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                         self.selected_app = i.to_string();
-                        //open_app(i);
                     }
                     ui.add_space(8.0);
                 }
@@ -216,13 +238,18 @@ impl eframe::App for CatapultApp {
                     ui.add(egui::Label::new(app_name));
                     let button_text = RichText::new("LAUNCH >").size(64.0);
                     if ui.add(egui::Button::new(button_text)).clicked(){
-                        open_app(&self.selected_app);
+                        let pid = open_app(&self.selected_app);
+                        self.sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                        track_app(pid, &self);
+                        self.running_apps.insert(self.selected_app.clone(), pid);
                         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                     };
                     ui.add_space(8.0);
                     if ui.add(egui::Button::new("Edit App")).clicked(){
                         self.edit = true;
                     }
+                    let readable_time = time_from_millis(*self.app_play_time.get(&self.selected_app).unwrap_or(&0));
+                    ui.label(format!("Time played: {}", readable_time));
                 } else {
                     ui.label("Select an App");
                 };
@@ -270,11 +297,32 @@ impl eframe::App for CatapultApp {
                         if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(Key::Escape)){
                             self.edit = false
                     };
-                    }); 
-                }
-                
-            
-            });
+                }); 
+            }
+
+            ctx.request_repaint();        
+        });
+
+        self.delta_time = Instant::now().checked_duration_since(self.last_instant).unwrap();
+        self.last_instant = Instant::now();
+
+        for app in self.running_apps.keys(){
+            let pid = self.running_apps.get(app).unwrap();
+            self.sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            let process = track_app(*pid, &self);
+            if process.is_none(){
+                self.app_to_remove = app.clone();
+            } else {
+                let current_play_time = *self.app_play_time.get(app).unwrap_or(&0);
+                self.app_play_time.insert(app.clone(), current_play_time + self.delta_time.as_millis() as usize);
+            }
+        }
+
+        if self.app_to_remove != "".to_string(){
+            self.running_apps.remove(&self.app_to_remove);
+            self.app_to_remove = "".to_string();
+        }
+
     }
 }
 
@@ -317,12 +365,20 @@ fn set_stylings(ctx: &egui::Context){
     ctx.set_theme(ThemePreference::Dark);
 }
 
-fn open_app(name : &String){
-    let open = that(name);
-    match open {
-        Ok(()) => {}
-        Err(err) => {println!("{:?}", err)}
+fn open_app(name : &String) -> usize{
+    let mut command = Command::new(name);
+    
+    if let Ok(child) = command.spawn() {
+        child.id() as usize
+    } else {
+        println!("open command didn't start");
+        0
     }
+}
+
+fn track_app(pid : usize, app : &CatapultApp) -> Option<&Process>{
+    let process = app.sys.process(Pid::from(pid));
+    process
 }
 
 fn get_color_icon(exe_path : String, size : [usize; 2]) -> ColorImage{
@@ -333,4 +389,11 @@ fn get_color_icon(exe_path : String, size : [usize; 2]) -> ColorImage{
                     
     let color_icon = egui::ColorImage::from_rgba_premultiplied(size, app_icon_image.as_bytes());
     color_icon
+}
+
+fn time_from_millis(millis : usize) -> String{
+    let seconds = (millis / 1000) % 60;
+    let minutes = (seconds / 60) % 60;
+    let hours = (minutes / 60) % 24;
+    format!("{} hours, {} minutes, {} seconds", hours, minutes, seconds)
 }

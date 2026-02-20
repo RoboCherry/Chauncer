@@ -24,5 +24,7 @@ open = "5.3.3"
 
 file_icon_provider = "1.0.0"
 
+sysinfo = "0.38"
+
 
 
