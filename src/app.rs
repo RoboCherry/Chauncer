@@ -18,7 +18,7 @@ pub struct CatapultApp {
     apps : Vec<String>,
     selected_app : String,
     apps_aliases : HashMap<String, String>,
-    app_play_time : HashMap<String, usize>,
+    app_play_time : HashMap<String, u64>,
 
     #[serde(skip)]
     app_texture_handles : HashMap<String, TextureHandle>,
@@ -248,7 +248,7 @@ impl eframe::App for CatapultApp {
                     if ui.add(egui::Button::new("Edit App")).clicked(){
                         self.edit = true;
                     }
-                    let readable_time = time_from_millis(*self.app_play_time.get(&self.selected_app).unwrap_or(&0));
+                    let readable_time = time_from_millis(*self.app_play_time.get(&self.selected_app).unwrap_or(&(0 as u64)));
                     ui.label(format!("Time played: {}", readable_time));
                 } else {
                     ui.label("Select an App");
@@ -314,7 +314,7 @@ impl eframe::App for CatapultApp {
                 self.app_to_remove = app.clone();
             } else {
                 let current_play_time = *self.app_play_time.get(app).unwrap_or(&0);
-                self.app_play_time.insert(app.clone(), current_play_time + self.delta_time.as_millis() as usize);
+                self.app_play_time.insert(app.clone(), current_play_time + self.delta_time.as_millis() as u64);
             }
         }
 
@@ -391,9 +391,9 @@ fn get_color_icon(exe_path : String, size : [usize; 2]) -> ColorImage{
     color_icon
 }
 
-fn time_from_millis(millis : usize) -> String{
+fn time_from_millis(millis : u64) -> String{
     let seconds = millis / 1000;
     let minutes = seconds / 60;
     let hours = minutes / 60;
-    format!("{} hours, {} minutes, {} seconds", hours % 24, minutes % 60, seconds % 60)
+    format!("{} hours, {} minutes, {} seconds", hours, minutes % 60, seconds % 60)
 }
