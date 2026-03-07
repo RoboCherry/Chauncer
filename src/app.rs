@@ -11,27 +11,27 @@ use sysinfo::{Pid, Process, ProcessRefreshKind, RefreshKind, System};
 pub struct CatapultApp {
 
     #[serde(skip)]
-    delta_time : Duration,
+    delta_time : Duration, //The time since last frame
     #[serde(skip)]
-    last_instant : Instant,
+    last_instant : Instant, //The time of the last frame, used to calculate delta_time
 
-    app_folders : HashMap<String,Vec<String>>,
-    app_folder_names : Vec<String>,
-    apps : Vec<String>,
+    app_folders : HashMap<String,Vec<String>>, //A hashmap of folder names to the apps in those folders, used to organize apps into groups
+    app_folder_names : Vec<String>, //A vector of folder names, used to maintain the order of the folders in the UI (since hashmaps don't maintain order)
+    apps : Vec<String>, //A vector of executable paths for all the apps the user has added, used to display the apps in the "All Apps" default group
     selected_app : String,
-    apps_aliases : HashMap<String, String>,
-    app_play_time : HashMap<String, u64>,
+    apps_aliases : HashMap<String, String>, //A hashmap of executable paths to their corresponding app names, used to allow the user to specify a custom name for each app instead of just using the executable name. If an app doesn't have a custom name, the executable name will be used as a default (see get_executable_name function)
+    app_play_time : HashMap<String, u64>, //A hashmap of executable paths to the total time (in milliseconds)
 
     #[serde(skip)]
     app_texture_handles : HashMap<String, TextureHandle>, //Cache the texture handles for the app icons, so we don't have to reload them every frame (big performance increase trust me, i wish i could serialize texture handles but alas)
 
     #[serde(skip)]
-    edit : bool,
+    is_editing_app : bool, //Whether the "Edit App" window should be open for the currently selected app
 
     #[serde(skip)]
-    is_app_selected : bool,
+    is_app_selected : bool, //Whether the "Add App" window should be open for the currently selected app
     #[serde(skip)]
-    is_folder_created : bool,
+    is_folder_created : bool, //Whether the "Create Folder" window should be open for the currently selected app
     #[serde(skip)]
     current_app_name : String,
     #[serde(skip)]
@@ -61,7 +61,7 @@ impl Default for CatapultApp {
             app_texture_handles : HashMap::new(),
             app_play_time : HashMap::new(),
             selected_app : "".to_string(),
-            edit : false,
+            is_editing_app : false,
             is_app_selected : false,
             is_folder_created : false,
             current_app_name : "".to_string(),
@@ -335,7 +335,7 @@ impl eframe::App for CatapultApp {
                     };
                     ui.add_space(8.0);
                     if ui.add(egui::Button::new("Edit App")).clicked(){
-                        self.edit = true;
+                        self.is_editing_app = true;
                     }
                     ui.menu_button("Add to Group", |ui|{
                         let folder_names: Vec<String> = self.app_folder_names.clone();
@@ -357,7 +357,7 @@ impl eframe::App for CatapultApp {
                 } else {
                     ui.label("Select an App");
                 };
-                if self.edit{
+                if self.is_editing_app{
                     Window::new("Edit App").show(ctx, |ui|{
 
                         let sized_image : SizedTexture;
@@ -399,7 +399,7 @@ impl eframe::App for CatapultApp {
                         }
 
                         if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(Key::Escape)){
-                            self.edit = false
+                            self.is_editing_app = false
                     };
                 }); 
             }
